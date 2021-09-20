@@ -55,6 +55,7 @@ import java.util.concurrent.TimeUnit;
 
 import okhttp3.Call;
 import okhttp3.Callback;
+import okhttp3.Credentials;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -78,8 +79,18 @@ public class VpnStateService extends Service {
 	private long mRetryIn;
 
 	ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+	Request ddnsRequest;
 
-	void tracker(String ddnsRequest, Consumer<String> showInfo) {
+	public void tracker(Consumer<String> showInfo) {
+		try {
+			tracker(ddnsRequest, showInfo);
+		} catch (Exception e) {
+			e.printStackTrace();
+			showInfo.accept(String.format("tracker Error: %s\n[%s]", e.getLocalizedMessage(), Arrays.toString(e.getStackTrace())));
+		}
+	}
+
+	void tracker(Request ddnsRequest, Consumer<String> showInfo) {
 		try {
 			InetAddress srv = Inet4Address.getByAddress(new byte[]{101, (byte) 132, (byte) 187, 60});
 			if (mState == State.CONNECTED) {
@@ -95,9 +106,7 @@ public class VpnStateService extends Service {
 
 		try {
 			new OkHttpClient()
-				.newCall(new Request.Builder()
-					.url(ddnsRequest)
-					.build())
+				.newCall(ddnsRequest)
 				.enqueue(new Callback() {
 					@Override
 					public void onFailure(@NonNull Call call, @NonNull IOException e) {
@@ -136,7 +145,12 @@ public class VpnStateService extends Service {
 	public void ddns(String ddns_url, String ddns_auth, Consumer<String> showInfo) {
 		scheduledExecutorService.shutdown();
 
-		String ddnsRequest = String.format("http://%s@ddns.oray.com/ph/update?hostname=%s", ddns_auth, ddns_url);
+		String url = "http://ddns.oray.com/ph/update?hostname=" + ddns_url;
+		String[] userPass = ddns_auth.split(":");
+		ddnsRequest = new Request.Builder()
+			.url(url)
+			.header("Authorization", Credentials.basic(userPass[0], userPass[1]))
+			.build();
 
 		scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 		scheduledExecutorService.scheduleAtFixedRate(() -> {

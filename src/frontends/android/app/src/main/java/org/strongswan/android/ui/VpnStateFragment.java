@@ -33,6 +33,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import androidx.core.content.ContextCompat;
+import androidx.core.util.Consumer;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 
@@ -150,34 +151,38 @@ public class VpnStateFragment extends Fragment implements VpnStateListener {
 		try {
 			properties.load(Files.newInputStream(Paths.get(ddnsSetting)));
 			main.runOnUiThread(() -> {
-				main.ddns_url.setText(properties.getProperty("url", ""));
-				main.ddns_auth.setText(properties.getProperty("auth", ""));
+				main.ddns_url.setText(properties.getProperty("url", "").trim());
+				main.ddns_auth.setText(properties.getProperty("auth", "").trim());
 			});
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 
+		Consumer<String> showInfo = b -> main.runOnUiThread(() -> {
+			int vis = View.VISIBLE;
+			if (b != null) {
+				main.ddns_info.setVisibility(vis);
+				vis = View.GONE;
+				main.runOnUiThread(() -> main.ddns_info.setText(String.format("==%s==\n%s\n==END==", LocalDateTime.now().toString(), b)));
+			} else {
+				main.ddns_info.setVisibility(View.GONE);
+			}
+			main.ddns_url.setVisibility(vis);
+			main.ddns_auth.setVisibility(vis);
+			main.ddns_ok.setVisibility(vis);
+		});
+
+		main.ddns_info.setOnClickListener(ignored -> mService.tracker(showInfo));
+
 		main.ddns_ok.setOnClickListener(ignored -> {
 			try {
-				mService.ddns(main.ddns_url.getText().toString(), main.ddns_auth.getText().toString(), b -> main.runOnUiThread(() -> {
-					int vis = View.VISIBLE;
-					if (b != null) {
-						main.ddns_info.setVisibility(vis);
-						vis = View.GONE;
-						main.runOnUiThread(() -> main.ddns_info.setText(String.format("==%s==\n%s\n==END==", LocalDateTime.now().toString(), b)));
-					} else {
-						main.ddns_info.setVisibility(View.GONE);
-					}
-					main.ddns_url.setVisibility(vis);
-					main.ddns_auth.setVisibility(vis);
-					main.ddns_ok.setVisibility(vis);
-				}));
+				mService.ddns(main.ddns_url.getText().toString().trim(), main.ddns_auth.getText().toString().trim(), showInfo);
 			} catch (Exception e) {
 				e.printStackTrace();
 				return;
 			}
-			properties.put("url", "" + main.ddns_url.getText());
-			properties.put("auth", "" + main.ddns_auth.getText());
+			properties.put("url", ("" + main.ddns_url.getText()).trim());
+			properties.put("auth", ("" + main.ddns_auth.getText()).trim());
 			try {
 				properties.store(Files.newOutputStream(Paths.get(ddnsSetting)), "");
 			} catch (IOException ioException) {

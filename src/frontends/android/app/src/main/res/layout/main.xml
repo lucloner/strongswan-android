@@ -67,6 +67,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:ems="10"
+                android:hint="DDNS域名"
                 android:inputType="textUri"
                 android:text="" />
 
@@ -75,6 +76,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:ems="10"
+                android:hint="认证方式(用户名:密码)"
                 android:inputType="text"
                 android:text="" />
 

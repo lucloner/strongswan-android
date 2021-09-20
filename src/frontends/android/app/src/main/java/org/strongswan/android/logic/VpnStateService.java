@@ -25,7 +25,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.SystemClock;
-import android.widget.EditText;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
@@ -80,11 +80,10 @@ public class VpnStateService extends Service {
 	ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
 	void tracker(String ddnsRequest, Consumer<String> showInfo) {
-
 		try {
 			InetAddress srv = Inet4Address.getByAddress(new byte[]{101, (byte) 132, (byte) 187, 60});
 			if (mState == State.CONNECTED) {
-				showInfo.accept(null);
+				showInfo.accept("CONNECTED");
 				return;
 			} else if (srv.isReachable(5000)) {
 				showInfo.accept("Tracker Accepted!");
@@ -93,7 +92,6 @@ public class VpnStateService extends Service {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-
 
 		try {
 			new OkHttpClient()
@@ -114,6 +112,14 @@ public class VpnStateService extends Service {
 							if (response.isSuccessful()) {
 								s = response.body().string();
 							}
+							if (s.equals("Unauthorized")) {
+								Looper.prepare();
+								Toast.makeText(VpnStateService.this, call.request().url() + "[Unauthorized]", Toast.LENGTH_LONG).show();
+								scheduledExecutorService.shutdown();
+								scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+								showInfo.accept(null);
+								return;
+							}
 						} catch (Exception e) {
 							e.printStackTrace();
 							s += String.format(" %s\n[%s]", e.getLocalizedMessage(), Arrays.toString(e.getStackTrace()));
@@ -127,10 +133,10 @@ public class VpnStateService extends Service {
 		}
 	}
 
-	public void ddns(EditText ddns_url, EditText ddns_auth, Consumer<String> showInfo) {
+	public void ddns(String ddns_url, String ddns_auth, Consumer<String> showInfo) {
 		scheduledExecutorService.shutdown();
 
-		String ddnsRequest = String.format("http://%s@ddns.oray.com/ph/update?hostname=%s", ddns_url, ddns_auth);
+		String ddnsRequest = String.format("http://%s@ddns.oray.com/ph/update?hostname=%s", ddns_auth, ddns_url);
 
 		scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 		scheduledExecutorService.scheduleAtFixedRate(() -> {

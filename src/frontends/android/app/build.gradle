@@ -5,10 +5,10 @@ android {
 
     defaultConfig {
         applicationId "org.strongswan.android"
-        minSdkVersion 26
+        minSdkVersion 28
         targetSdkVersion 31
         versionCode 75
-        versionName "2.3.3"
+        versionName "2.3.3.1"
     }
 
     sourceSets.main {

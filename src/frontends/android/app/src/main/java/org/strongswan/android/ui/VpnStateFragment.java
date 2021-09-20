@@ -28,8 +28,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -45,9 +43,11 @@ import org.strongswan.android.logic.VpnStateService.ErrorState;
 import org.strongswan.android.logic.VpnStateService.State;
 import org.strongswan.android.logic.VpnStateService.VpnStateListener;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.Properties;
 
 public class VpnStateFragment extends Fragment implements VpnStateListener {
@@ -66,7 +66,7 @@ public class VpnStateFragment extends Fragment implements VpnStateListener {
 	private Button mShowLog;
 	private VpnStateService mService;
 
-	private static final String ddnsSetting = "ddns.properties";
+	String ddnsSetting;
 	private final ServiceConnection mServiceConnection = new ServiceConnection() {
 		@Override
 		public void onServiceDisconnected(ComponentName name) {
@@ -82,70 +82,19 @@ public class VpnStateFragment extends Fragment implements VpnStateListener {
 			}
 		}
 	};
-	FrameLayout ddns_layout;
-	EditText ddns_url;
-	EditText ddns_auth;
-	Button ddns_ok;
-	TextView ddns_info;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 
-		FragmentActivity activity = getActivity();
-		assert activity != null;
+		FragmentActivity activity = requireActivity();
 		mColorStateError = ContextCompat.getColor(activity, R.color.error_text);
 		mColorStateSuccess = ContextCompat.getColor(activity, R.color.success_text);
-
-		ddns_layout = activity.findViewById(R.id.ddns);
-		ddns_url = activity.findViewById(R.id.txt_ddns);
-		ddns_auth = activity.findViewById(R.id.txt_auth);
-		ddns_ok = activity.findViewById(R.id.btn_ddns);
-		ddns_info = activity.findViewById(R.id.txt_info);
-
-		Properties properties = new Properties();
-		try {
-			properties.load(Files.newInputStream(Paths.get(ddnsSetting)));
-			ddns_url.setText(properties.getProperty("url", ""));
-			ddns_auth.setText(properties.getProperty("auth", ""));
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-		ddns_ok.setOnClickListener(ignored -> {
-			try {
-				mService.ddns(ddns_url, ddns_auth, b -> {
-					int vis = View.VISIBLE;
-					if (b != null) {
-						ddns_info.setVisibility(vis);
-						vis = View.GONE;
-						activity.runOnUiThread(() -> ddns_info.setText(b));
-					} else {
-						ddns_info.setVisibility(View.GONE);
-					}
-					ddns_url.setVisibility(vis);
-					ddns_auth.setVisibility(vis);
-					ddns_ok.setVisibility(vis);
-				});
-			} catch (Exception e) {
-				e.printStackTrace();
-				return;
-			}
-			properties.put("url", "" + ddns_url.getText());
-			properties.put("auth", "" + ddns_auth.getText());
-			try {
-				properties.store(Files.newOutputStream(Paths.get(ddnsSetting)), "");
-			} catch (IOException ioException) {
-				ioException.printStackTrace();
-			}
-		});
 
 		/* bind to the service only seems to work from the ApplicationContext */
 		Context context = activity.getApplicationContext();
 		context.bindService(new Intent(context, VpnStateService.class),
 			mServiceConnection, Service.BIND_AUTO_CREATE);
-
-
 	}
 
 	@Override
@@ -192,6 +141,49 @@ public class VpnStateFragment extends Fragment implements VpnStateListener {
 			mService.registerListener(this);
 			updateView();
 		}
+
+		MainActivity main = (MainActivity) requireActivity();
+		main.getDataDir().mkdirs();
+		ddnsSetting = main.getDataDir().getAbsolutePath() + File.separator + "ddns.properties";
+
+		Properties properties = new Properties();
+		try {
+			properties.load(Files.newInputStream(Paths.get(ddnsSetting)));
+			main.runOnUiThread(() -> {
+				main.ddns_url.setText(properties.getProperty("url", ""));
+				main.ddns_auth.setText(properties.getProperty("auth", ""));
+			});
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		main.ddns_ok.setOnClickListener(ignored -> {
+			try {
+				mService.ddns(main.ddns_url.getText().toString(), main.ddns_auth.getText().toString(), b -> main.runOnUiThread(() -> {
+					int vis = View.VISIBLE;
+					if (b != null) {
+						main.ddns_info.setVisibility(vis);
+						vis = View.GONE;
+						main.runOnUiThread(() -> main.ddns_info.setText(String.format("==%s==\n%s\n==END==", LocalDateTime.now().toString(), b)));
+					} else {
+						main.ddns_info.setVisibility(View.GONE);
+					}
+					main.ddns_url.setVisibility(vis);
+					main.ddns_auth.setVisibility(vis);
+					main.ddns_ok.setVisibility(vis);
+				}));
+			} catch (Exception e) {
+				e.printStackTrace();
+				return;
+			}
+			properties.put("url", "" + main.ddns_url.getText());
+			properties.put("auth", "" + main.ddns_auth.getText());
+			try {
+				properties.store(Files.newOutputStream(Paths.get(ddnsSetting)), "");
+			} catch (IOException ioException) {
+				ioException.printStackTrace();
+			}
+		});
 	}
 
 	@Override

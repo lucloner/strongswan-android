@@ -25,6 +25,10 @@ import android.os.Bundle;
 import android.text.format.Formatter;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.ActionBar;
@@ -45,8 +49,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity implements OnVpnProfileSelectedListener
-{
+public class MainActivity extends AppCompatActivity implements OnVpnProfileSelectedListener {
 	public static final String CONTACT_EMAIL = "android@strongswan.org";
 	public static final String EXTRA_CRL_LIST = "org.strongswan.android.CRL_LIST";
 
@@ -57,10 +60,22 @@ public class MainActivity extends AppCompatActivity implements OnVpnProfileSelec
 
 	private static final String DIALOG_TAG = "Dialog";
 
+	FrameLayout ddns_layout;
+	EditText ddns_url;
+	EditText ddns_auth;
+	Button ddns_ok;
+	TextView ddns_info;
+
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.main);
+
+		ddns_layout = requireViewById(R.id.ddns);
+		ddns_url = requireViewById(R.id.txt_ddns);
+		ddns_auth = requireViewById(R.id.txt_auth);
+		ddns_ok = requireViewById(R.id.btn_ddns);
+		ddns_info = requireViewById(R.id.txt_info);
 
 		ActionBar bar = getSupportActionBar();
 		if (bar != null) {

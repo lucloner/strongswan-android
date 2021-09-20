@@ -39,6 +39,7 @@
         <activity
             android:name=".ui.MainActivity"
             android:label="@string/main_activity_name"
+            android:exported="true"
             android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -53,7 +54,8 @@
             android:theme="@style/TransparentActivity"
             android:taskAffinity=""
             android:excludeFromRecents="true"
-            android:launchMode="singleTask" >
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="org.strongswan.android.action.START_PROFILE" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -89,7 +91,8 @@
         <activity
             android:name=".ui.VpnProfileSelectActivity"
             android:label="@string/strongswan_shortcut"
-            android:icon="@mipmap/ic_shortcut" >
+            android:exported="true"
+            android:icon="@mipmap/ic_shortcut">
             <intent-filter>
                 <action android:name="android.intent.action.CREATE_SHORTCUT" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -99,11 +102,14 @@
             android:name=".ui.VpnProfileImportActivity"
             android:label="@string/profile_import"
             android:taskAffinity=""
-            android:excludeFromRecents="true" >
+            android:excludeFromRecents="true"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
+
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+
                 <data android:scheme="http" />
                 <data android:scheme="https" />
                 <data android:scheme="file" />
@@ -145,10 +151,12 @@
         <activity
             android:name=".ui.TrustedCertificateImportActivity"
             android:label="@string/import_certificate"
-            android:theme="@style/TransparentActivity" >
+            android:exported="true"
+            android:theme="@style/TransparentActivity">
             <intent-filter tools:ignore="AppLinkUrlError">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
+
                 <data android:mimeType="application/x-x509-ca-cert" />
                 <data android:mimeType="application/x-x509-server-cert" />
                 <data android:mimeType="application/x-pem-file" />
@@ -172,6 +180,7 @@
             android:name=".ui.VpnTileService"
             android:label="@string/tile_default"
             android:icon="@drawable/ic_notification"
+            android:exported="false"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />

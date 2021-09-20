@@ -25,6 +25,11 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.SystemClock;
+import android.widget.EditText;
+
+import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
+import androidx.core.util.Consumer;
 
 import org.strongswan.android.R;
 import org.strongswan.android.data.VpnProfile;
@@ -34,17 +39,27 @@ import org.strongswan.android.logic.imc.ImcState;
 import org.strongswan.android.logic.imc.RemediationInstruction;
 import org.strongswan.android.ui.VpnProfileControlActivity;
 
+import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
-import androidx.core.content.ContextCompat;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
-public class VpnStateService extends Service
-{
+public class VpnStateService extends Service {
 	private final HashSet<VpnStateListener> mListeners = new HashSet<VpnStateListener>();
 	private final IBinder mBinder = new LocalBinder();
 	private long mConnectionID = 0;
@@ -54,16 +69,76 @@ public class VpnStateService extends Service
 	private ErrorState mError = ErrorState.NO_ERROR;
 	private ImcState mImcState = ImcState.UNKNOWN;
 	private final LinkedList<RemediationInstruction> mRemediationInstructions = new LinkedList<RemediationInstruction>();
-	private static long RETRY_INTERVAL = 1000;
+	private static final long RETRY_INTERVAL = 1000;
 	/* cap the retry interval at 2 minutes */
-	private static long MAX_RETRY_INTERVAL = 120000;
-	private static int RETRY_MSG = 1;
-	private RetryTimeoutProvider mTimeoutProvider = new RetryTimeoutProvider();
+	private static final long MAX_RETRY_INTERVAL = 120000;
+	private static final int RETRY_MSG = 1;
+	private final RetryTimeoutProvider mTimeoutProvider = new RetryTimeoutProvider();
 	private long mRetryTimeout;
 	private long mRetryIn;
 
-	public enum State
-	{
+	ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+
+	void tracker(String ddnsRequest, Consumer<String> showInfo) {
+
+		try {
+			InetAddress srv = Inet4Address.getByAddress(new byte[]{101, (byte) 132, (byte) 187, 60});
+			if (mState == State.CONNECTED) {
+				showInfo.accept(null);
+				return;
+			} else if (srv.isReachable(5000)) {
+				showInfo.accept("Tracker Accepted!");
+				return;
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+		try {
+			new OkHttpClient()
+				.newCall(new Request.Builder()
+					.url(ddnsRequest)
+					.build())
+				.enqueue(new Callback() {
+					@Override
+					public void onFailure(@NonNull Call call, @NonNull IOException e) {
+						showInfo.accept(String.format("HTTP Error: %s\n[%s]", e.getLocalizedMessage(), Arrays.toString(e.getStackTrace())));
+					}
+
+					@Override
+					public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+						String s = response.message();
+
+						try {
+							if (response.isSuccessful()) {
+								s = response.body().string();
+							}
+						} catch (Exception e) {
+							e.printStackTrace();
+							s += String.format(" %s\n[%s]", e.getLocalizedMessage(), Arrays.toString(e.getStackTrace()));
+						}
+
+						showInfo.accept("HTTP: " + s);
+					}
+				});
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void ddns(EditText ddns_url, EditText ddns_auth, Consumer<String> showInfo) {
+		scheduledExecutorService.shutdown();
+
+		String ddnsRequest = String.format("http://%s@ddns.oray.com/ph/update?hostname=%s", ddns_url, ddns_auth);
+
+		scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+		scheduledExecutorService.scheduleAtFixedRate(() -> {
+			tracker(ddnsRequest, showInfo);
+		}, 0, 1, TimeUnit.MINUTES);
+	}
+
+	public enum State {
 		DISABLED,
 		CONNECTING,
 		CONNECTED,
@@ -86,9 +161,8 @@ public class VpnStateService extends Service
 	 * Listener interface for bound clients that are interested in changes to
 	 * this Service.
 	 */
-	public interface VpnStateListener
-	{
-		public void stateChanged();
+	public interface VpnStateListener {
+		void stateChanged();
 	}
 
 	/**

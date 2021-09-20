@@ -28,9 +28,15 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
 
 import org.strongswan.android.R;
 import org.strongswan.android.data.VpnProfile;
@@ -39,11 +45,12 @@ import org.strongswan.android.logic.VpnStateService.ErrorState;
 import org.strongswan.android.logic.VpnStateService.State;
 import org.strongswan.android.logic.VpnStateService.VpnStateListener;
 
-import androidx.core.content.ContextCompat;
-import androidx.fragment.app.Fragment;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Properties;
 
-public class VpnStateFragment extends Fragment implements VpnStateListener
-{
+public class VpnStateFragment extends Fragment implements VpnStateListener {
 	private boolean mVisible;
 	private TextView mProfileNameView;
 	private TextView mProfileView;
@@ -58,50 +65,97 @@ public class VpnStateFragment extends Fragment implements VpnStateListener
 	private Button mErrorRetry;
 	private Button mShowLog;
 	private VpnStateService mService;
-	private final ServiceConnection mServiceConnection = new ServiceConnection()
-	{
+
+	private static final String ddnsSetting = "ddns.properties";
+	private final ServiceConnection mServiceConnection = new ServiceConnection() {
 		@Override
-		public void onServiceDisconnected(ComponentName name)
-		{
+		public void onServiceDisconnected(ComponentName name) {
 			mService = null;
 		}
 
 		@Override
-		public void onServiceConnected(ComponentName name, IBinder service)
-		{
-			mService = ((VpnStateService.LocalBinder)service).getService();
-			if (mVisible)
-			{
+		public void onServiceConnected(ComponentName name, IBinder service) {
+			mService = ((VpnStateService.LocalBinder) service).getService();
+			if (mVisible) {
 				mService.registerListener(VpnStateFragment.this);
 				updateView();
 			}
 		}
 	};
+	FrameLayout ddns_layout;
+	EditText ddns_url;
+	EditText ddns_auth;
+	Button ddns_ok;
+	TextView ddns_info;
 
 	@Override
-	public void onCreate(Bundle savedInstanceState)
-	{
+	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 
-		mColorStateError = ContextCompat.getColor(getActivity(), R.color.error_text);
-		mColorStateSuccess = ContextCompat.getColor(getActivity(), R.color.success_text);
+		FragmentActivity activity = getActivity();
+		assert activity != null;
+		mColorStateError = ContextCompat.getColor(activity, R.color.error_text);
+		mColorStateSuccess = ContextCompat.getColor(activity, R.color.success_text);
+
+		ddns_layout = activity.findViewById(R.id.ddns);
+		ddns_url = activity.findViewById(R.id.txt_ddns);
+		ddns_auth = activity.findViewById(R.id.txt_auth);
+		ddns_ok = activity.findViewById(R.id.btn_ddns);
+		ddns_info = activity.findViewById(R.id.txt_info);
+
+		Properties properties = new Properties();
+		try {
+			properties.load(Files.newInputStream(Paths.get(ddnsSetting)));
+			ddns_url.setText(properties.getProperty("url", ""));
+			ddns_auth.setText(properties.getProperty("auth", ""));
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		ddns_ok.setOnClickListener(ignored -> {
+			try {
+				mService.ddns(ddns_url, ddns_auth, b -> {
+					int vis = View.VISIBLE;
+					if (b != null) {
+						ddns_info.setVisibility(vis);
+						vis = View.GONE;
+						activity.runOnUiThread(() -> ddns_info.setText(b));
+					} else {
+						ddns_info.setVisibility(View.GONE);
+					}
+					ddns_url.setVisibility(vis);
+					ddns_auth.setVisibility(vis);
+					ddns_ok.setVisibility(vis);
+				});
+			} catch (Exception e) {
+				e.printStackTrace();
+				return;
+			}
+			properties.put("url", "" + ddns_url.getText());
+			properties.put("auth", "" + ddns_auth.getText());
+			try {
+				properties.store(Files.newOutputStream(Paths.get(ddnsSetting)), "");
+			} catch (IOException ioException) {
+				ioException.printStackTrace();
+			}
+		});
 
 		/* bind to the service only seems to work from the ApplicationContext */
-		Context context = getActivity().getApplicationContext();
+		Context context = activity.getApplicationContext();
 		context.bindService(new Intent(context, VpnStateService.class),
-							mServiceConnection, Service.BIND_AUTO_CREATE);
+			mServiceConnection, Service.BIND_AUTO_CREATE);
+
+
 	}
 
 	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container,
-							 Bundle savedInstanceState)
-	{
+							 Bundle savedInstanceState) {
 		View view = inflater.inflate(R.layout.vpn_state_fragment, null);
 
-		mActionButton = (Button)view.findViewById(R.id.action);
+		mActionButton = view.findViewById(R.id.action);
 		mActionButton.setOnClickListener(v -> {
-			if (mService != null)
-			{
+			if (mService != null) {
 				mService.disconnect();
 			}
 		});
@@ -111,15 +165,14 @@ public class VpnStateFragment extends Fragment implements VpnStateListener
 		mErrorText = view.findViewById(R.id.vpn_error_text);
 		mErrorRetry = view.findViewById(R.id.retry);
 		mShowLog = view.findViewById(R.id.show_log);
-		mProgress = (ProgressBar)view.findViewById(R.id.progress);
-		mStateView = (TextView)view.findViewById(R.id.vpn_state);
+		mProgress = view.findViewById(R.id.progress);
+		mStateView = view.findViewById(R.id.vpn_state);
 		mColorStateBase = mStateView.getCurrentTextColor();
-		mProfileView = (TextView)view.findViewById(R.id.vpn_profile_label);
-		mProfileNameView = (TextView)view.findViewById(R.id.vpn_profile_name);
+		mProfileView = view.findViewById(R.id.vpn_profile_label);
+		mProfileNameView = view.findViewById(R.id.vpn_profile_name);
 
 		mErrorRetry.setOnClickListener(v -> {
-			if (mService != null)
-			{
+			if (mService != null) {
 				mService.reconnect();
 			}
 		});
@@ -132,72 +185,60 @@ public class VpnStateFragment extends Fragment implements VpnStateListener
 	}
 
 	@Override
-	public void onStart()
-	{
+	public void onStart() {
 		super.onStart();
 		mVisible = true;
-		if (mService != null)
-		{
+		if (mService != null) {
 			mService.registerListener(this);
 			updateView();
 		}
 	}
 
 	@Override
-	public void onStop()
-	{
+	public void onStop() {
 		super.onStop();
 		mVisible = false;
-		if (mService != null)
-		{
+		if (mService != null) {
 			mService.unregisterListener(this);
 		}
 	}
 
 	@Override
-	public void onDestroy()
-	{
+	public void onDestroy() {
 		super.onDestroy();
-		if (mService != null)
-		{
+		if (mService != null) {
 			getActivity().getApplicationContext().unbindService(mServiceConnection);
 		}
 	}
 
 	@Override
-	public void stateChanged()
-	{
+	public void stateChanged() {
 		updateView();
 	}
 
-	public void updateView()
-	{
+	public void updateView() {
 		long connectionID = mService.getConnectionID();
 		VpnProfile profile = mService.getProfile();
 		State state = mService.getState();
 		ErrorState error = mService.getErrorState();
 		String name = "";
 
-		if (getActivity() == null)
-		{
+		if (getActivity() == null) {
 			return;
 		}
 
-		if (profile != null)
-		{
+		if (profile != null) {
 			name = profile.getName();
 		}
 
-		if (reportError(connectionID, name, error))
-		{
+		if (reportError(connectionID, name, error)) {
 			return;
 		}
 
 		mProfileNameView.setText(name);
 		mProgress.setIndeterminate(true);
 
-		switch (state)
-		{
+		switch (state) {
 			case DISABLED:
 				showProfile(false);
 				mProgress.setVisibility(View.GONE);
@@ -229,10 +270,8 @@ public class VpnStateFragment extends Fragment implements VpnStateListener
 		}
 	}
 
-	private boolean reportError(long connectionID, String name, ErrorState error)
-	{
-		if (error == ErrorState.NO_ERROR)
-		{
+	private boolean reportError(long connectionID, String name, ErrorState error) {
+		if (error == ErrorState.NO_ERROR) {
 			mErrorView.setVisibility(View.GONE);
 			return false;
 		}
@@ -243,16 +282,13 @@ public class VpnStateFragment extends Fragment implements VpnStateListener
 		enableActionButton(getString(android.R.string.cancel));
 
 		int retry = mService.getRetryIn();
-		if (retry > 0)
-		{
+		if (retry > 0) {
 			mProgress.setIndeterminate(false);
 			mProgress.setMax(mService.getRetryTimeout());
 			mProgress.setProgress(retry);
 			mProgress.setVisibility(View.VISIBLE);
 			mStateView.setText(getResources().getQuantityString(R.plurals.retry_in, retry, retry));
-		}
-		else if (mService.getRetryTimeout() <= 0)
-		{
+		} else if (mService.getRetryTimeout() <= 0) {
 			mProgress.setVisibility(View.GONE);
 		}
 
@@ -262,14 +298,12 @@ public class VpnStateFragment extends Fragment implements VpnStateListener
 		return true;
 	}
 
-	private void showProfile(boolean show)
-	{
+	private void showProfile(boolean show) {
 		mProfileView.setVisibility(show ? View.VISIBLE : View.GONE);
 		mProfileNameView.setVisibility(show ? View.VISIBLE : View.GONE);
 	}
 
-	private void enableActionButton(String text)
-	{
+	private void enableActionButton(String text) {
 		mActionButton.setText(text);
 		mActionButton.setEnabled(text != null);
 		mActionButton.setVisibility(text != null ? View.VISIBLE : View.GONE);

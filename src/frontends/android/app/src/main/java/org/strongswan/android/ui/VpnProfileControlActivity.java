@@ -36,14 +36,6 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
 
-import org.strongswan.android.R;
-import org.strongswan.android.data.VpnProfile;
-import org.strongswan.android.data.VpnProfileDataSource;
-import org.strongswan.android.data.VpnType.VpnTypeFeature;
-import org.strongswan.android.logic.VpnStateService;
-import org.strongswan.android.logic.VpnStateService.State;
-import org.strongswan.android.utils.Constants;
-
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
@@ -54,6 +46,14 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 import androidx.preference.PreferenceManager;
+
+import org.strongswan.android.R;
+import org.strongswan.android.data.VpnProfile;
+import org.strongswan.android.data.VpnProfileDataSource;
+import org.strongswan.android.data.VpnType.VpnTypeFeature;
+import org.strongswan.android.logic.VpnStateService;
+import org.strongswan.android.logic.VpnStateService.State;
+import org.strongswan.android.utils.Constants;
 
 public class VpnProfileControlActivity extends AppCompatActivity
 {
@@ -353,12 +353,11 @@ public class VpnProfileControlActivity extends AppCompatActivity
 		}
 		dataSource.close();
 
-		if (profile != null)
-		{
+		if (profile != null) {
 			startVpnProfile(profile);
-		}
-		else
-		{
+		} else if (VpnProfileDataSource.ghost.getUUID().toString().equals(profileUUID)) {
+			startVpnProfile(VpnProfileDataSource.ghost);
+		} else {
 			Toast.makeText(this, R.string.profile_not_found, Toast.LENGTH_LONG).show();
 			finish();
 		}
@@ -541,24 +540,21 @@ public class VpnProfileControlActivity extends AppCompatActivity
 	public static class LoginDialog extends AppCompatDialogFragment
 	{
 		@Override
-		public Dialog onCreateDialog(Bundle savedInstanceState)
-		{
+		public Dialog onCreateDialog(Bundle savedInstanceState) {
 			final Bundle profileInfo = getArguments();
 			LayoutInflater inflater = getActivity().getLayoutInflater();
 			View view = inflater.inflate(R.layout.login_dialog, null);
-			EditText username = (EditText)view.findViewById(R.id.username);
+			EditText username = view.findViewById(R.id.username);
 			username.setText(profileInfo.getString(VpnProfileDataSource.KEY_USERNAME));
-			final EditText password = (EditText)view.findViewById(R.id.password);
+			final EditText password = view.findViewById(R.id.password);
 
 			AlertDialog.Builder adb = new AlertDialog.Builder(getActivity());
 			adb.setView(view);
 			adb.setTitle(getString(R.string.login_title));
-			adb.setPositiveButton(R.string.login_confirm, new DialogInterface.OnClickListener()
-			{
+			adb.setPositiveButton(R.string.login_confirm, new DialogInterface.OnClickListener() {
 				@Override
-				public void onClick(DialogInterface dialog, int whichButton)
-				{
-					VpnProfileControlActivity activity = (VpnProfileControlActivity)getActivity();
+				public void onClick(DialogInterface dialog, int whichButton) {
+					VpnProfileControlActivity activity = (VpnProfileControlActivity) getActivity();
 					profileInfo.putString(VpnProfileDataSource.KEY_PASSWORD, password.getText().toString().trim());
 					activity.prepareVpnService(profileInfo);
 				}

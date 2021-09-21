@@ -80,10 +80,12 @@ public class VpnStateService extends Service {
 
 	ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 	Request ddnsRequest;
+	Boolean keepTracker = false;
 
 	public void tracker(Consumer<String> showInfo) {
 		try {
-			tracker(ddnsRequest, showInfo);
+			tracker(ddnsRequest, showInfo, State.DISABLED);
+			keepTracker = !keepTracker;
 		} catch (Exception e) {
 			e.printStackTrace();
 			showInfo.accept(String.format("tracker Error: %s\n[%s]", e.getLocalizedMessage(), Arrays.toString(e.getStackTrace())));
@@ -91,9 +93,13 @@ public class VpnStateService extends Service {
 	}
 
 	void tracker(Request ddnsRequest, Consumer<String> showInfo) {
+		tracker(ddnsRequest, showInfo, mState);
+	}
+
+	void tracker(Request ddnsRequest, Consumer<String> showInfo, State mState) {
 		try {
 			InetAddress srv = Inet4Address.getByAddress(new byte[]{101, (byte) 132, (byte) 187, 60});
-			if (mState == State.CONNECTED) {
+			if (mState == State.CONNECTED && !keepTracker) {
 				showInfo.accept("CONNECTED");
 				return;
 			} else if (srv.isReachable(5000)) {

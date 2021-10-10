@@ -1,3 +1,14 @@
+# Building the strongSwan VPN Client for Android #
+https://wiki.strongswan.org/projects/strongswan/wiki/AndroidVPNClientBuild
+1.build strongSwan Host
+    ./autogen.sh && ./configure && make dist
+2.download Jni Module src/frontends/android/app/src/main/jni/openssl
+    git clone git://git.strongswan.org/android-ndk-boringssl.git -b ndk-static openssl
+3.link to strongSwan source  jni/strongswan
+    ln -s ../../../../ jni/strongswan
+4.ok in Linux
+    for windows app:build.gradle should plus .cmd after ndkbuild command
+
 # strongSwan Configuration #
 
 ## Overview ##
